@@ -1,4 +1,3 @@
-Rakib CSE, [6/29/2025 11:11 PM]
 import React, { createContext, useContext, useEffect, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
@@ -10,7 +9,7 @@ const AppContext = createContext();
 export const AppContextProvider = ({ children }) => {
     const [products, setProducts] = useState([]);
     const [cartItems, setCartItems] = useState({});
-    const [currency, setCurrency] = useState("₹");
+    const [currency, setCurrency] = useState(import.meta.env.VITE_CURRENCY || "৳");
     const [showUserLogin, setShowUserLogin] = useState(false);
     const [user, setUser] = useState(null);
     const [isSeller, setIsSeller] = useState(false);
@@ -18,17 +17,14 @@ export const AppContextProvider = ({ children }) => {
 
     const navigate = useNavigate();
 
-    // --- CRUCIAL FIX: Determine base URL dynamically for deployment ---
-    // If VITE_BACKEND_URL is set (e.g., in Vercel environment variables), use it.
-    // Otherwise, default to localhost for local development.
-    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL  "http://localhost:4000"; 
-    console.log("Frontend AppContext: API Base URL:", BACKEND_URL); // Debugging log to see the URL being used
+    // ✅ Fixed backend URL logic
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:4000";
+    console.log("Frontend AppContext: API Base URL:", BACKEND_URL);
 
     const apiClient = axios.create({
-        baseURL: BACKEND_URL, // Use the dynamic URL here
+        baseURL: BACKEND_URL,
         withCredentials: true,
     });
-    // --- END CRUCIAL FIX ---
 
     const fetchProducts = async () => {
         try {
@@ -37,11 +33,11 @@ export const AppContextProvider = ({ children }) => {
                 setProducts(response.data.products);
             } else {
                 console.error("Failed to fetch products:", response.data.message);
-                toast.error(response.data.message  "Failed to load products.");
+                toast.error(response.data.message || "Failed to load products.");
             }
         } catch (error) {
             console.error("Error fetching products:", error);
-            toast.error(error.message  "Network error fetching products.");
+            toast.error(error.message || "Network error fetching products.");
         }
     };
 
@@ -54,7 +50,7 @@ export const AppContextProvider = ({ children }) => {
                 });
                 if (response.data.success) {
                     setUser(response.data.user);
-                    setCartItems(response.data.user.cartItems  {});
+                    setCartItems(response.data.user.cartItems || {});
                 } else {
                     setUser(null);
                     localStorage.removeItem("token");
@@ -64,9 +60,14 @@ export const AppContextProvider = ({ children }) => {
                 console.error("Error checking user auth:", error);
                 setUser(null);
                 localStorage.removeItem("token");
-                if (error.response && error.response.status === 403 && error.response.data.redirectToVerify) {
+
+                if (
+                    error.response &&
+                    error.response.status === 403 &&
+                    error.response.data.redirectToVerify
+                ) {
                     toast.error("Please verify your email address.");
-                    navigate(/verify-email?email=${encodeURIComponent(user?.email || "")});
+                    navigate(`/verify-email?email=${encodeURIComponent(user?.email || "")}`);
                 } else {
                     toast.error(error.response?.data?.message || "Authentication check failed.");
                 }
@@ -79,12 +80,7 @@ export const AppContextProvider = ({ children }) => {
     const checkSellerAuth = async () => {
         try {
             const response = await apiClient.get("/api/seller/is-auth");
-            if (response.data.success) {
-                setIsSeller(true);
-            } else {
-                setIsSeller(false);
-                console.log("Seller not authenticated.");
-            }
+            setIsSeller(response.data.success);
         } catch (error) {
             console.error("Error checking seller auth:", error);
             setIsSeller(false);
@@ -102,11 +98,11 @@ export const AppContextProvider = ({ children }) => {
         checkSellerAuth();
     }, []);
 
-Rakib CSE, [6/29/2025 11:11 PM]
-useEffect(() => {
+    useEffect(() => {
         const timer = setTimeout(() => {
             if (user && user._id && Object.keys(cartItems).length > 0) {
-                apiClient.post("/api/cart/update", { cartItems })
+                apiClient
+                    .post("/api/cart/update", { cartItems })
                     .then(({ data }) => {
                         if (!data.success) {
                             toast.error(data.message);
@@ -115,14 +111,14 @@ useEffect(() => {
                     .catch((error) => {
                         console.error("Cart update failed:", error);
                         if (error.response?.status !== 401) {
-                             toast.error(error.response?.data?.message || "Cart update failed");
+                            toast.error(error.response?.data?.message || "Cart update failed");
                         }
                     });
             }
         }, 300);
 
         return () => clearTimeout(timer);
-    }, [cartItems, user, apiClient]);
+    }, [cartItems, user]);
 
     const AddToCart = (itemId) => {
         setCartItems((prev) => ({
@@ -152,7 +148,7 @@ useEffect(() => {
 
     const getCartCount = () => {
         let count = 0;
-        if (typeof cartItems === 'object' && cartItems !== null) {
+        if (typeof cartItems === "object" && cartItems !== null) {
             for (const item in cartItems) {
                 count += cartItems[item];
             }
@@ -162,15 +158,15 @@ useEffect(() => {
 
     const getCartAmount = () => {
         let total = 0;
-        if (Array.isArray(products) && typeof cartItems === 'object' && cartItems !== null) {
-            for (const items in cartItems) {
-                const product = products.find((product) => product._id === items);
+        if (Array.isArray(products) && typeof cartItems === "object" && cartItems !== null) {
+            for (const item in cartItems) {
+                const product = products.find((product) => product._id === item);
                 if (product) {
-                    total += product.offerPrice * cartItems[items];
+                    total += product.offerPrice * cartItems[item];
                 }
             }
         }
-        return parseFloat((total).toFixed(2));
+        return parseFloat(total.toFixed(2));
     };
 
     const contextValue = {
@@ -191,7 +187,9 @@ useEffect(() => {
         setUser,
         isSeller,
         setIsSeller,
-        assets
+        assets,
+        searchQuery,
+        setSearchQuery,
     };
 
     return (
