@@ -103,7 +103,7 @@ export const assets = {
 export const categories = [
   {
     text: "Dog Breeds",
-    path: "Vegetables",
+    path: "Dog",
     image: organic_vegitable_image,
     bgColor: "#FEF6DA",
   },
